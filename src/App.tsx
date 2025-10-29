@@ -1,9 +1,9 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { BookOpen } from "lucide-react"
 import BookCard from "./components/BookCard"
 import AuthorCard from "./components/AuthorCard"
 import SearchBar from "./components/SearchBar"
-import { staticBooks, staticAuthors } from "./mockData/staticData"
+import { getAllBooks, getAllAuthors } from "./services/bookService"
 import AddAuthorForm from "./components/tabs/AddAuthorForm"
 import type { Author } from "./types/Authors"
 import AddBookForm from "./components/tabs/AddBookForm"
@@ -12,35 +12,69 @@ import type { Book } from "./types/Book"
 import NavigationTabs from "./components/NavogationTabs"
 
 const App = () => {
-	// State
 	const [activeTab, setActiveTab] = useState("books")
 	const [searchTerm, setSearchTerm] = useState("")
+	const [books, setBooks] = useState<Book[]>([])
+	const [authors, setAuthors] = useState<Author[]>([])
+	const [loading, setLoading] = useState(true)
+
+	useEffect(() => {
+		const fetchData = async () => {
+			setLoading(true)
+			try {
+				const [fetchedBooks, fetchedAuthors] = await Promise.all([
+					getAllBooks(),
+					getAllAuthors(),
+				])
+				setBooks(fetchedBooks as Book[])
+				setAuthors(fetchedAuthors as Author[])
+			} catch (error) {
+				console.error("Failed to fetch initial data:", error)
+			} finally {
+				setLoading(false)
+			}
+		}
+
+		fetchData()
+	}, [])
 
 	const handleAddAuthor = (author: Author) => {
-		console.log("New author:", author)
-		// Here you would typically:
-		// - Call your API to save the author
-		// - Update your state
-		// - Show a success message
+		// Generate a temporary ID for the new author based on the max existing ID
+		const newId = Math.max(...authors.map(a => a.id ?? 0), 0) + 1
+		const newAuthor = { ...author, id: newId }
+
+		// Update the authors state array
+		setAuthors((prevAuthors) => [...prevAuthors, newAuthor])
+
+		// Switch back to the 'authors' tab to show the new author
+		setActiveTab("authors")
+
+		console.log("New author added:", newAuthor)
 	}
 
 	const handleAddBook = (book: Book) => {
-		console.log("New book:", book)
-		// Here you would typically:
-		// - Call your API to save the book
-		// - Update your state
-		// - Show a success message
+		// Generate a temporary ID for the new book based on the max existing ID
+		const newId = Math.max(...books.map(b => b.id ?? 0), 0) + 1
+		const newBook = { ...book, id: newId }
+
+		// Update the books state array
+		setBooks((prevBooks) => [...prevBooks, newBook])
+		
+		// Switch back to the 'books' tab to show the new book
+		setActiveTab("books")
+
+		console.log("New book added:", newBook)
 	}
 
 	const getAuthorById = (authorId: number) => {
-		return staticAuthors.find((author) => author.id === authorId)
+		return authors.find((author) => author.id === authorId)
 	}
 
 	const getBookCountByAuthor = (authorId: number) => {
-		return staticBooks.filter((book) => book.authorId === authorId).length
+		return books.filter((book) => book.authorId === authorId).length
 	}
 
-	const filteredBooks = staticBooks.filter((book) => {
+	const filteredBooks = books.filter((book) => {
 		const author = getAuthorById(book.authorId)
 		return (
 			book.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -48,13 +82,12 @@ const App = () => {
 		)
 	})
 
-	const filteredAuthors = staticAuthors.filter((author) =>
+	const filteredAuthors = authors.filter((author) =>
 		author.name.toLowerCase().includes(searchTerm.toLowerCase())
 	)
 
 	return (
 		<div className="min-h-screen bg-gray-100">
-			{/* Header */}
 			<header className="bg-indigo-600 text-white shadow-lg">
 				<div className="container mx-auto px-4 py-6">
 					<div className="flex items-center gap-3 mb-4">
@@ -65,7 +98,6 @@ const App = () => {
 				</div>
 			</header>
 
-			{/* Navigation Tabs */}
 			<NavigationTabs
 				activeTab={activeTab}
 				setActiveTab={setActiveTab}
@@ -73,9 +105,14 @@ const App = () => {
 				authorsCount={filteredAuthors.length}
 			/>
 
-			{/* Main Content */}
 			<main className="container mx-auto px-4 py-8">
-				{activeTab === "books" && (
+				{loading && (
+					<div className="text-center py-12 text-gray-500 text-xl font-medium">
+						Loading data...
+					</div>
+				)}
+
+				{!loading && activeTab === "books" && (
 					<div className="space-y-4 flex flex-col flex-wrap">
 						{filteredBooks.length > 0 ? (
 							filteredBooks.map((book) => (
@@ -93,14 +130,14 @@ const App = () => {
 					</div>
 				)}
 
-				{activeTab === "authors" && (
+				{!loading && activeTab === "authors" && (
 					<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 						{filteredAuthors.length > 0 ? (
 							filteredAuthors.map((author) => (
 								<AuthorCard
 									key={author.id}
 									author={author}
-									bookCount={getBookCountByAuthor(author.id)}
+									bookCount={getBookCountByAuthor(author.id!)}
 								/>
 							))
 						) : (
@@ -111,15 +148,15 @@ const App = () => {
 					</div>
 				)}
 
-				{activeTab === "add-author" && (
+				{!loading && activeTab === "add-author" && (
 					<AddAuthorForm
 						onSubmit={handleAddAuthor}
-						onCancel={() => console.log("Cancelled")}
+						onCancel={() => setActiveTab("authors")}
 					/>
 				)}
 
-				{activeTab === "add-book" && (
-					<AddBookForm authors={staticAuthors} onSubmit={handleAddBook} />
+				{!loading && activeTab === "add-book" && (
+					<AddBookForm authors={authors} onSubmit={handleAddBook} />
 				)}
 			</main>
 		</div>
