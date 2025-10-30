@@ -11,6 +11,9 @@ import type { Book } from "./types/Book"
 
 import NavigationTabs from "./components/NavogationTabs"
 
+// Utility type to assert that the ID property exists for components that rely on it
+type ItemWithId<T> = T & { id: number }
+
 const App = () => {
 	const [activeTab, setActiveTab] = useState("books")
 	const [searchTerm, setSearchTerm] = useState("")
@@ -39,28 +42,22 @@ const App = () => {
 	}, [])
 
 	const handleAddAuthor = (author: Author) => {
-		// Generate a temporary ID for the new author based on the max existing ID
 		const newId = Math.max(...authors.map(a => a.id ?? 0), 0) + 1
 		const newAuthor = { ...author, id: newId }
 
-		// Update the authors state array
 		setAuthors((prevAuthors) => [...prevAuthors, newAuthor])
 
-		// Switch back to the 'authors' tab to show the new author
 		setActiveTab("authors")
 
 		console.log("New author added:", newAuthor)
 	}
 
 	const handleAddBook = (book: Book) => {
-		// Generate a temporary ID for the new book based on the max existing ID
 		const newId = Math.max(...books.map(b => b.id ?? 0), 0) + 1
 		const newBook = { ...book, id: newId }
 
-		// Update the books state array
 		setBooks((prevBooks) => [...prevBooks, newBook])
 		
-		// Switch back to the 'books' tab to show the new book
 		setActiveTab("books")
 
 		console.log("New book added:", newBook)
@@ -118,8 +115,8 @@ const App = () => {
 							filteredBooks.map((book) => (
 								<BookCard
 									key={book.id}
-									book={book}
-									author={getAuthorById(book.authorId)!}
+									book={book as ItemWithId<Book>}
+									author={getAuthorById(book.authorId)! as ItemWithId<Author>}
 								/>
 							))
 						) : (
@@ -136,7 +133,7 @@ const App = () => {
 							filteredAuthors.map((author) => (
 								<AuthorCard
 									key={author.id}
-									author={author}
+									author={author as ItemWithId<Author>}
 									bookCount={getBookCountByAuthor(author.id!)}
 								/>
 							))
