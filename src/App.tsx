@@ -3,7 +3,7 @@ import { BookOpen } from "lucide-react"
 import BookCard from "./components/BookCard"
 import AuthorCard from "./components/AuthorCard"
 import SearchBar from "./components/SearchBar"
-import { getAllBooks, getAllAuthors } from "./services/bookService"
+import { getAllBooks, getAllAuthors, searchBooksByTitle } from "./services/bookService"
 import AddAuthorForm from "./components/tabs/AddAuthorForm"
 import type { Author } from "./types/Authors"
 import AddBookForm from "./components/tabs/AddBookForm"
@@ -11,7 +11,6 @@ import type { Book } from "./types/Book"
 
 import NavigationTabs from "./components/NavogationTabs"
 
-// Utility type to assert that the ID property exists for components that rely on it
 type ItemWithId<T> = T & { id: number }
 
 const App = () => {
@@ -19,6 +18,7 @@ const App = () => {
 	const [searchTerm, setSearchTerm] = useState("")
 	const [books, setBooks] = useState<Book[]>([])
 	const [authors, setAuthors] = useState<Author[]>([])
+	const [searchedBooks, setSearchedBooks] = useState<Book[]>([])
 	const [loading, setLoading] = useState(true)
 
 	useEffect(() => {
@@ -31,6 +31,7 @@ const App = () => {
 				])
 				setBooks(fetchedBooks as Book[])
 				setAuthors(fetchedAuthors as Author[])
+				setSearchedBooks(fetchedBooks as Book[])
 			} catch (error) {
 				console.error("Failed to fetch initial data:", error)
 			} finally {
@@ -40,6 +41,28 @@ const App = () => {
 
 		fetchData()
 	}, [])
+
+	useEffect(() => {
+		const fetchSearchResults = async () => {
+			const trimmedSearchTerm = searchTerm.trim()
+			if (activeTab === "books" && trimmedSearchTerm.length > 2) {
+				setLoading(true)
+				try {
+					const results = await searchBooksByTitle(trimmedSearchTerm)
+					setSearchedBooks(results)
+				} catch (error) {
+					console.error("Search failed:", error)
+					setSearchedBooks([])
+				} finally {
+					setLoading(false)
+				}
+			} else if (activeTab === "books" && trimmedSearchTerm.length <= 2) {
+				setSearchedBooks(books)
+			}
+		}
+
+		fetchSearchResults()
+	}, [searchTerm, activeTab, books])
 
 	const handleAddAuthor = (author: Author) => {
 		const newId = Math.max(...authors.map(a => a.id ?? 0), 0) + 1
@@ -57,6 +80,7 @@ const App = () => {
 		const newBook = { ...book, id: newId }
 
 		setBooks((prevBooks) => [...prevBooks, newBook])
+		setSearchedBooks((prevBooks) => [...prevBooks, newBook])
 		
 		setActiveTab("books")
 
@@ -70,14 +94,6 @@ const App = () => {
 	const getBookCountByAuthor = (authorId: number) => {
 		return books.filter((book) => book.authorId === authorId).length
 	}
-
-	const filteredBooks = books.filter((book) => {
-		const author = getAuthorById(book.authorId)
-		return (
-			book.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-			author?.name.toLowerCase().includes(searchTerm.toLowerCase())
-		)
-	})
 
 	const filteredAuthors = authors.filter((author) =>
 		author.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -98,7 +114,7 @@ const App = () => {
 			<NavigationTabs
 				activeTab={activeTab}
 				setActiveTab={setActiveTab}
-				booksCount={filteredBooks.length}
+				booksCount={searchedBooks.length}
 				authorsCount={filteredAuthors.length}
 			/>
 
@@ -111,10 +127,10 @@ const App = () => {
 
 				{!loading && activeTab === "books" && (
 					<div className="space-y-4 flex flex-col flex-wrap">
-						{filteredBooks.length > 0 ? (
-							filteredBooks.map((book) => (
+						{searchedBooks.length > 0 ? (
+							searchedBooks.map((book, index) => (
 								<BookCard
-									key={book.id}
+									key={book.id ?? `${book.title}-${index}`}
 									book={book as ItemWithId<Book>}
 									author={getAuthorById(book.authorId)! as ItemWithId<Author>}
 								/>
